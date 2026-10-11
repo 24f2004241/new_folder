@@ -1,13 +1,13 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 import json
 import os
 
 app = FastAPI()
 
-# Enable CORS for POST requests from any origin
+# Enable CORS for requests from any origin
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,11 +16,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Explicitly handle preflight OPTIONS requests
+@app.options("/{path:path}")
+async def options_handler(path: str):
+    return Response(status_code=200)
+
 class TelemetryRequest(BaseModel):
     regions: List[str]
     threshold_ms: float
 
-# Load telemetry bundle data at startup
 DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "q-vercel-latency.json")
 try:
     with open(DATA_FILE, "r") as f:
@@ -36,7 +40,6 @@ def analyze_latency(payload: TelemetryRequest):
     results = {}
     
     for region in regions:
-        # Filter records matching the specific region
         region_records = [r for r in TELEMETRY_DATA if r.get("region") == region]
         
         if not region_records:
@@ -51,20 +54,15 @@ def analyze_latency(payload: TelemetryRequest):
         latencies = [r.get("latency_ms", 0) for r in region_records]
         uptimes = [r.get("uptime", 0) for r in region_records]
         
-        # Compute average latency
         avg_latency = sum(latencies) / len(latencies)
         
-        # Compute 95th percentile latency
         sorted_latencies = sorted(latencies)
         p95_index = int(0.95 * len(sorted_latencies))
         if p95_index >= len(sorted_latencies):
             p95_index = len(sorted_latencies) - 1
         p95_latency = sorted_latencies[p95_index]
         
-        # Compute average uptime
         avg_uptime = sum(uptimes) / len(uptimes)
-        
-        # Compute breaches (records above threshold)
         breaches = sum(1 for l in latencies if l > threshold)
         
         results[region] = {
