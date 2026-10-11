@@ -25,7 +25,7 @@ class TelemetryRequest(BaseModel):
     regions: List[str]
     threshold_ms: float
 
-DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "q-vercel-latency.json")
+DATA_FILE = os.path.join(os.path.dirname(__file__), "q-vercel-latency.json")
 try:
     with open(DATA_FILE, "r") as f:
         TELEMETRY_DATA = json.load(f)
